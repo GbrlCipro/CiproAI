@@ -6,7 +6,7 @@ export class GeminiService {
   private genAI: GoogleGenerativeAI;
 
   constructor() {
-    this.genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '');
+    this.genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
   }
 
   async gerarResposta(historico: { role: 'system' | 'user' | 'assistant'; content: string }[]): Promise<string> {
