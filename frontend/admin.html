@@ -1,0 +1,263 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Empresas - CiproAI</title>
+<style>
+:root{--ink:#1f2133;--muted:#62657a;--line:#dcdce8;--bg:#f6f6fb;--card:#fff;--accent:#4f46e5;--accent-d:#4338ca;--ok:#15803d;--bad:#b91c1c}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.5 "Segoe UI",system-ui,sans-serif}
+button,input,textarea{font:inherit;color:inherit}
+:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+[hidden]{display:none!important}
+header{display:flex;align-items:center;justify-content:space-between;padding:12px 20px;background:var(--accent);color:#fff}
+header h1{margin:0;font-size:1.1rem}
+.btn{border:1px solid var(--line);background:var(--card);padding:8px 14px;border-radius:6px;cursor:pointer}
+.btn:hover{border-color:var(--accent)}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:#fff}
+.btn.primary:hover{background:var(--accent-d)}
+header .btn{background:transparent;border-color:rgba(255,255,255,.6);color:#fff}
+.login{max-width:380px;margin:12vh auto;padding:24px;background:var(--card);border:1px solid var(--line);border-radius:8px}
+.login h2{margin:0 0 4px}
+.login p{margin:0 0 16px;color:var(--muted)}
+label{display:block;font-weight:600;margin:16px 0 4px}
+input[type=text],input[type=password],textarea{width:100%;padding:10px;border:1px solid var(--line);border-radius:6px;background:#fff}
+textarea{min-height:340px;resize:vertical;line-height:1.55}
+.app{display:grid;grid-template-columns:290px 1fr;min-height:calc(100vh - 54px)}
+aside{border-right:1px solid var(--line);background:var(--card);padding:16px}
+aside .btn{width:100%;margin-bottom:12px}
+.lista{list-style:none;margin:0;padding:0}
+.item{display:block;width:100%;text-align:left;padding:10px 12px;border:1px solid transparent;border-radius:6px;background:none;cursor:pointer}
+.item:hover{background:var(--bg)}
+.item[aria-current=true]{background:#eef0ff;border-color:var(--accent)}
+.item small{display:block;color:var(--muted)}
+.item small.on{color:var(--ok)}
+main{padding:24px;max-width:780px;width:100%}
+main h2{margin:0 0 4px}
+.dica{color:var(--muted);margin:0 0 4px;font-size:.9rem}
+.linha{display:flex;justify-content:space-between;gap:12px;color:var(--muted);font-size:.9rem}
+.check{display:flex;align-items:center;gap:8px;margin-top:16px;font-weight:600}
+.acoes{display:flex;flex-wrap:wrap;gap:10px;margin-top:20px}
+.aviso{margin-top:14px;min-height:1.5em;font-weight:600}
+.aviso.ok{color:var(--ok)}.aviso.erro{color:var(--bad)}
+.vazio{padding:40px 0;color:var(--muted)}
+.id{font-family:Consolas,monospace;font-size:.85rem;color:var(--muted);word-break:break-all}
+@media(max-width:760px){.app{grid-template-columns:1fr}aside{border-right:0;border-bottom:1px solid var(--line)}}
+</style>
+</head>
+<body>
+<header><h1>CiproAI: Empresas</h1><button class="btn" id="btnSair" hidden>Sair</button></header>
+
+<section class="login" id="login">
+  <h2>Acesso do administrador</h2>
+  <p>Digite a chave definida em ADMIN_API_KEY no .env do backend.</p>
+  <label for="chave">Chave de administrador</label>
+  <input type="password" id="chave" autocomplete="off">
+  <div class="acoes"><button class="btn primary" id="btnEntrar">Entrar</button></div>
+  <div class="aviso erro" id="erroLogin" role="alert"></div>
+</section>
+
+<div class="app" id="app" hidden>
+  <aside>
+    <button class="btn primary" id="btnNova">Nova empresa</button>
+    <ul class="lista" id="lista"></ul>
+  </aside>
+  <main>
+    <h2 id="titulo"></h2>
+    <p class="id" id="idEmpresa"></p>
+
+    <label for="nome">Nome da empresa</label>
+    <input type="text" id="nome" maxlength="120">
+
+    <label for="prompt">Instruções do assistente</label>
+    <p class="dica">Diga quem é o assistente, como ele fala, os dados reais da empresa (horário, endereço, formas de pagamento) e o que ele não deve fazer.</p>
+    <textarea id="prompt" maxlength="8000"></textarea>
+    <div class="linha"><span></span><span id="contador"></span></div>
+
+    <label class="check"><input type="checkbox" id="ativo"> Empresa ativa (o assistente responde aos visitantes)</label>
+
+    <div class="acoes">
+      <button class="btn primary" id="btnSalvar">Salvar alterações</button>
+      <button class="btn" id="btnLink">Copiar link do chat</button>
+    </div>
+    <div class="aviso" id="aviso" role="status"></div>
+  </main>
+</div>
+
+<script>
+const API_URL = 'http://localhost:3000';
+// Endereço do chat: admin.html deve ficar na mesma pasta do index.html. Em produção, troque aqui.
+const CHAT_URL = new URL('index.html', window.location.href).href;
+
+let chave = sessionStorage.getItem('adminKey') || '';
+let empresas = [];
+let selecionadaId = null; // null = empresa nova
+
+const $ = (id) => document.getElementById(id);
+
+async function api(caminho, opcoes = {}) {
+    const resp = await fetch(API_URL + caminho, {
+        ...opcoes,
+        headers: { 'Content-Type': 'application/json', 'x-admin-key': chave }
+    });
+    if (resp.status === 401) {
+        sair('Chave incorreta. Confira o ADMIN_API_KEY no .env e reinicie o backend se mudou.');
+        throw new Error('401');
+    }
+    if (!resp.ok) {
+        let msg = `Erro ${resp.status}`;
+        try {
+            const d = await resp.json();
+            msg = Array.isArray(d.message) ? d.message.join(' ') : (d.message || msg);
+        } catch (e) { /* mantém a mensagem padrão */ }
+        throw new Error(msg);
+    }
+    return resp.json();
+}
+
+function aviso(texto, tipo = '') {
+    const el = $('aviso');
+    el.textContent = texto;
+    el.className = 'aviso ' + tipo;
+}
+
+function sair(erro = '') {
+    chave = '';
+    sessionStorage.removeItem('adminKey');
+    $('app').hidden = true;
+    $('btnSair').hidden = true;
+    $('login').hidden = false;
+    $('erroLogin').textContent = erro;
+}
+
+async function entrar() {
+    chave = $('chave').value.trim();
+    if (!chave) return;
+    $('erroLogin').textContent = '';
+    try {
+        await carregar();
+        sessionStorage.setItem('adminKey', chave);
+        $('login').hidden = true;
+        $('app').hidden = false;
+        $('btnSair').hidden = false;
+        $('chave').value = '';
+        if (empresas.length) selecionar(empresas[0].id); else novaEmpresa();
+    } catch (e) {
+        if (e.message !== '401') $('erroLogin').textContent = 'Não foi possível falar com o servidor. O backend está rodando em ' + API_URL + '?';
+    }
+}
+
+async function carregar() {
+    empresas = (await api('/empresas')).sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'));
+    renderLista();
+}
+
+function renderLista() {
+    const ul = $('lista');
+    ul.replaceChildren();
+    if (!empresas.length) {
+        const p = document.createElement('li');
+        p.className = 'vazio';
+        p.textContent = 'Nenhuma empresa ainda. Crie a primeira.';
+        ul.appendChild(p);
+        return;
+    }
+    empresas.forEach((e) => {
+        const li = document.createElement('li');
+        const b = document.createElement('button');
+        b.className = 'item';
+        b.setAttribute('aria-current', String(e.id === selecionadaId));
+        const nome = document.createElement('span');
+        nome.textContent = e.nome;
+        const st = document.createElement('small');
+        st.textContent = e.ativo ? 'Ativa' : 'Inativa';
+        if (e.ativo) st.className = 'on';
+        b.append(nome, st);
+        b.addEventListener('click', () => selecionar(e.id));
+        li.appendChild(b);
+        ul.appendChild(li);
+    });
+}
+
+function selecionar(id) {
+    const e = empresas.find((x) => x.id === id);
+    if (!e) return novaEmpresa();
+    selecionadaId = id;
+    $('titulo').textContent = e.nome;
+    $('idEmpresa').textContent = 'ID: ' + e.id;
+    $('nome').value = e.nome;
+    $('prompt').value = e.promptSistema;
+    $('ativo').checked = e.ativo;
+    $('btnLink').hidden = false;
+    aviso('');
+    atualizarContador();
+    renderLista();
+}
+
+function novaEmpresa() {
+    selecionadaId = null;
+    $('titulo').textContent = 'Nova empresa';
+    $('idEmpresa').textContent = '';
+    $('nome').value = '';
+    $('prompt').value = '';
+    $('ativo').checked = true;
+    $('btnLink').hidden = true;
+    aviso('');
+    atualizarContador();
+    renderLista();
+    $('nome').focus();
+}
+
+function atualizarContador() {
+    $('contador').textContent = $('prompt').value.length + ' de 8000 caracteres';
+}
+
+async function salvar() {
+    const corpo = {
+        nome: $('nome').value.trim(),
+        promptSistema: $('prompt').value.trim(),
+        ativo: $('ativo').checked
+    };
+    if (!corpo.nome || !corpo.promptSistema) {
+        return aviso('Preencha o nome e as instruções do assistente.', 'erro');
+    }
+    $('btnSalvar').disabled = true;
+    try {
+        const salva = selecionadaId
+            ? await api('/empresas/' + selecionadaId, { method: 'PATCH', body: JSON.stringify(corpo) })
+            : await api('/empresas', { method: 'POST', body: JSON.stringify(corpo) });
+        await carregar();
+        selecionar(salva.id);
+        aviso('Alterações salvas.', 'ok');
+    } catch (e) {
+        if (e.message !== '401') aviso(e.message, 'erro');
+    } finally {
+        $('btnSalvar').disabled = false;
+    }
+}
+
+async function copiarLink() {
+    if (!selecionadaId) return;
+    const link = CHAT_URL + '?empresa=' + selecionadaId;
+    try {
+        await navigator.clipboard.writeText(link);
+        aviso('Link copiado: ' + link, 'ok');
+    } catch (e) {
+        aviso('Não foi possível copiar. Link: ' + link, 'erro');
+    }
+}
+
+$('btnEntrar').addEventListener('click', entrar);
+$('chave').addEventListener('keydown', (e) => { if (e.key === 'Enter') entrar(); });
+$('btnSair').addEventListener('click', () => sair());
+$('btnNova').addEventListener('click', novaEmpresa);
+$('btnSalvar').addEventListener('click', salvar);
+$('btnLink').addEventListener('click', copiarLink);
+$('prompt').addEventListener('input', atualizarContador);
+
+// Reabre sozinho se a chave ainda estiver na sessão da aba
+if (chave) { $('chave').value = chave; entrar(); }
+</script>
+</body>
+</html>

@@ -1,4 +1,4 @@
-import { Entity, Column, PrimaryGeneratedColumn } from 'typeorm';
+import { Entity, Column, PrimaryGeneratedColumn, Index } from 'typeorm';
 
 @Entity()
 export class Cliente {
@@ -13,4 +13,9 @@ export class Cliente {
 
   @Column({ default: 'novo' })
   status?: string;
+
+  // Empresa a que este cliente pertence (define qual prompt o bot usa)
+  @Index()
+  @Column({ type: 'varchar', nullable: true })
+  empresaId?: string | null;
 }

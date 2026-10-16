@@ -3,6 +3,7 @@ import { ConfigModule } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { ClientsModule } from './clientes/clients.module';
 import { ConversasModule } from './conversas/conversas.module';
+import { EmpresasModule } from './empresas/empresas.module';
 import { IaModule } from './ia/ia.module';
 
 
@@ -12,9 +13,10 @@ import { IaModule } from './ia/ia.module';
         TypeOrmModule.forRoot({
             type: 'better-sqlite3',
             database: 'ciproai.sqlite', // O arquivo do banco será criado automaticamente na raiz
-            entities: [__dirname + '/**/*.entity{.ts,.js}'], // Vamos criar essas entidades em breve
+            entities: [__dirname + '/**/*.entity{.ts,.js}'],
             synchronize: true, // Em produção, mude para false! Isso cria as tabelas automaticamente
         }),
+        EmpresasModule,
         ClientsModule,
         ConversasModule,
         IaModule,

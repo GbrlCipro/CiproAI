@@ -117,3 +117,7 @@ body {
 .chat-input-area button:hover {
     background: #0056b3;
 }
+
+.message.error {
+    color: #b91c1c;
+}

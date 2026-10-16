@@ -1,4 +1,4 @@
-import { IsString, IsNotEmpty, IsOptional, IsIn } from 'class-validator';
+import { IsString, IsNotEmpty, IsOptional, IsIn, IsUUID } from 'class-validator';
 
 export class CreateClienteDto {
   @IsString()
@@ -8,6 +8,9 @@ export class CreateClienteDto {
   @IsString()
   @IsNotEmpty()
   telefone!: string;
+
+  @IsUUID()
+  empresaId!: string;
 
   @IsOptional()
   @IsIn(['novo', 'em_atendimento', 'qualificado', 'convertido'])
